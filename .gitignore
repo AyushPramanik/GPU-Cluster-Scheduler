@@ -1,0 +1,44 @@
+# Binaries (anchored so they don't match cmd/ or internal/ package dirs)
+/bin/
+*.exe
+*.out
+/gpu-scheduler
+/scheduler
+/node-agent
+/api-gateway
+/metrics
+
+# Go
+vendor/
+*.test
+coverage.out
+coverage.html
+
+# Env / secrets
+.env
+.env.local
+*.pem
+
+# Node / Next.js
+web/node_modules/
+web/.next/
+web/out/
+web/next-env.d.ts
+web/*.tsbuildinfo
+node_modules/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+*.tfvars
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
