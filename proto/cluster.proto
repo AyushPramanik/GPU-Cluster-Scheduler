@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package cluster.v1;
+
+option go_package = "github.com/ayushpramanik/gpu-cluster-scheduler/internal/grpc/clusterpb;clusterpb";
+
+// NodeService is implemented by the scheduler and called by node agents. Agents
+// register, heartbeat their health/usage, poll for job assignments, report job
+// status transitions, and stream execution logs back to the control plane.
+service NodeService {
+  // Register announces a node (or re-announces it after a restart) with its
+  // total capacity.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // Heartbeat reports liveness and current live resource availability. Missing
+  // heartbeats cause the node to be marked down and its jobs rescheduled.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // GetAssignments returns jobs the scheduler has placed on this node that the
+  // agent has not yet started.
+  rpc GetAssignments(AssignmentsRequest) returns (AssignmentsResponse);
+
+  // UpdateJobStatus reports a job lifecycle transition (running/completed/failed).
+  rpc UpdateJobStatus(JobStatusUpdate) returns (Ack);
+
+  // StreamLogs is a client-streaming RPC the agent uses to ship job log lines to
+  // the control plane, where recent lines are cached for the API.
+  rpc StreamLogs(stream LogLine) returns (Ack);
+}
+
+message Resources {
+  int32 gpu = 1;
+  int32 cpu = 2;
+  int32 memory_gb = 3;
+}
+
+message RegisterRequest {
+  string node_id = 1;
+  string hostname = 2;
+  Resources capacity = 3;
+  string gpu_model = 4;
+  double cost_per_hour = 5;
+  bool spot = 6;
+  map<string, string> labels = 7;
+}
+
+message RegisterResponse {
+  bool accepted = 1;
+  string message = 2;
+}
+
+message HeartbeatRequest {
+  string node_id = 1;
+  Resources available = 2;
+  double gpu_utilization = 3;
+}
+
+message HeartbeatResponse {
+  // desired_status lets the control plane push cordon/drain decisions down to
+  // the agent (e.g. "draining").
+  string desired_status = 1;
+}
+
+message AssignmentsRequest {
+  string node_id = 1;
+}
+
+message Job {
+  string job_id = 1;
+  string name = 2;
+  string image = 3;
+  string command = 4;
+  Resources request = 5;
+  int32 priority = 6;
+}
+
+message AssignmentsResponse {
+  repeated Job jobs = 1;
+}
+
+message JobStatusUpdate {
+  string job_id = 1;
+  string node_id = 2;
+  string status = 3;   // running | completed | failed
+  string message = 4;
+  int32 exit_code = 5;
+}
+
+message LogLine {
+  string job_id = 1;
+  string node_id = 2;
+  int64 timestamp_unix_ms = 3;
+  string line = 4;
+}
+
+message Ack {
+  bool ok = 1;
+}
