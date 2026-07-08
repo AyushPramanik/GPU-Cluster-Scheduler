@@ -1,0 +1,57 @@
+# syntax=docker/dockerfile:1.7
+#
+# Next.js frontend image (web/). Multi-stage: deps -> build -> runtime.
+# Build context is ./web:
+#   docker build -f deploy/docker/Dockerfile.frontend -t frontend ./web
+#
+# Uses Next.js standalone output for a small runtime image. If the app does not
+# set `output: "standalone"` we fall back to a full `next start`.
+
+########################  deps  ########################
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json* npm-shrinkwrap.json* ./
+# Prefer reproducible installs when a lockfile exists.
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+########################  build  ########################
+FROM node:20-alpine AS build
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+########################  runtime  ########################
+FROM node:20-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
+
+# Standalone server + static assets. These COPYs assume `output: "standalone"`.
+# If standalone is not enabled, swap the runtime for the `full` stage below.
+COPY --from=build --chown=nextjs:nodejs /app/public ./public
+COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+EXPOSE 3000
+CMD ["node", "server.js"]
+
+########################  full (fallback, non-standalone)  ########################
+# Build this stage explicitly with `--target full` if you do NOT enable
+# `output: "standalone"` in next.config.js.
+FROM node:20-alpine AS full
+WORKDIR /app
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/next.config.js ./next.config.js
+EXPOSE 3000
+CMD ["npm", "run", "start"]
