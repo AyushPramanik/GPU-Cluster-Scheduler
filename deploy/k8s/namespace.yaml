@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gpu-scheduler
+  labels:
+    app.kubernetes.io/part-of: gpu-cluster-scheduler
+    name: gpu-scheduler

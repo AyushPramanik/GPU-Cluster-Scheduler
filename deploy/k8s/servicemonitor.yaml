@@ -1,0 +1,45 @@
+# ServiceMonitors for the Prometheus Operator (kube-prometheus-stack).
+# If you are NOT running the operator, the prometheus.io/scrape annotations on
+# each Service/pod (already set) are enough for an annotation-based scrape config.
+# Requires the monitoring.coreos.com CRDs to be installed.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gpu-scheduler-services
+  namespace: gpu-scheduler
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/part-of: gpu-cluster-scheduler
+spec:
+  namespaceSelector:
+    matchNames:
+      - gpu-scheduler
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: ["api-gateway", "scheduler", "metrics"]
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 5s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gpu-scheduler-node-agent
+  namespace: gpu-scheduler
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/part-of: gpu-cluster-scheduler
+spec:
+  namespaceSelector:
+    matchNames:
+      - gpu-scheduler
+  selector:
+    matchLabels:
+      app: node-agent
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 5s

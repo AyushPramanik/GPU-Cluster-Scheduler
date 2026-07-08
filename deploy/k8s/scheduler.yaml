@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: scheduler
+  namespace: gpu-scheduler
+  labels:
+    app: scheduler
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9091"
+    prometheus.io/path: /metrics
+spec:
+  selector:
+    app: scheduler
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+    - name: metrics
+      port: 9091
+      targetPort: 9091
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+  namespace: gpu-scheduler
+  labels:
+    app: scheduler
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: scheduler
+  template:
+    metadata:
+      labels:
+        app: scheduler
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: scheduler
+          image: gpu-cluster-scheduler/scheduler:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 50051
+            - name: metrics
+              containerPort: 9091
+          envFrom:
+            - configMapRef:
+                name: gpu-scheduler-config
+            - secretRef:
+                name: gpu-scheduler-db
+          env:
+            - name: GRPC_ADDR
+              value: ":50051"
+            - name: METRICS_ADDR
+              value: ":9091"
+            - name: OTEL_SERVICE_NAME
+              value: scheduler
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9091
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9091
+            initialDelaySeconds: 15
+            periodSeconds: 20

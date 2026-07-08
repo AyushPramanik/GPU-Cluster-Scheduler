@@ -1,0 +1,36 @@
+# Ingress for the REST API and the Next.js frontend.
+# Works with the ingress-nginx controller (kind: `kubectl apply` the ingress-nginx
+# manifest first; k3s ships Traefik - change ingressClassName to "traefik").
+# Add to /etc/hosts:  127.0.0.1 api.gpu-scheduler.local app.gpu-scheduler.local
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gpu-scheduler
+  namespace: gpu-scheduler
+  labels:
+    app.kubernetes.io/part-of: gpu-cluster-scheduler
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.gpu-scheduler.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+    - host: app.gpu-scheduler.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 3000

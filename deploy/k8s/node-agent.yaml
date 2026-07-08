@@ -1,0 +1,97 @@
+# node-agent runs one pod per node (DaemonSet) so it can report that node's
+# GPU/CPU/memory. Headless service gives stable DNS for the metrics aggregator.
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-agent
+  namespace: gpu-scheduler
+  labels:
+    app: node-agent
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9092"
+    prometheus.io/path: /metrics
+spec:
+  clusterIP: None
+  selector:
+    app: node-agent
+  ports:
+    - name: grpc
+      port: 50061
+      targetPort: 50061
+    - name: metrics
+      port: 9092
+      targetPort: 9092
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: gpu-scheduler
+  labels:
+    app: node-agent
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: node-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9092"
+        prometheus.io/path: /metrics
+    spec:
+      # Schedule onto GPU nodes in a real cluster (kind/k3s ignore missing labels
+      # when the selector is absent). Uncomment to pin to GPU nodes:
+      # nodeSelector:
+      #   nvidia.com/gpu.present: "true"
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: node-agent
+          image: gpu-cluster-scheduler/node-agent:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 50061
+            - name: metrics
+              containerPort: 9092
+          envFrom:
+            - configMapRef:
+                name: gpu-scheduler-config
+            - secretRef:
+                name: gpu-scheduler-db
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: GRPC_ADDR
+              value: ":50061"
+            - name: METRICS_ADDR
+              value: ":9092"
+            - name: OTEL_SERVICE_NAME
+              value: node-agent
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9092
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9092
+            initialDelaySeconds: 15
+            periodSeconds: 20
