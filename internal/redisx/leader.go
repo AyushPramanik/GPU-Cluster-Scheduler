@@ -36,8 +36,6 @@ type LeaderElector struct {
 	identity string
 	ttl      time.Duration
 	log      *slog.Logger
-
-	onElected func(ctx context.Context)
 }
 
 // NewLeaderElector builds an elector for the given lock key and lease TTL.
