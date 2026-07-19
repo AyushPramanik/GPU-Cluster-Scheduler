@@ -7,10 +7,6 @@ heterogeneous GPU nodes using pluggable placement algorithms, tracks execution,
 and exposes production-grade observability into cluster health and scheduling
 decisions.
 
-> Not a toy: leader-elected HA scheduler, gRPC control plane, preemption,
-> starvation prevention, bin-packing, fault recovery, Prometheus/Grafana/OTel
-> observability, and a polished Next.js dashboard — all runnable with one command.
-
 ---
 
 ## Architecture
